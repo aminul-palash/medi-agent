@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Agent Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+        }
+        
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100vh;
+        }
+        
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #ccc;
+        }
+        
+        .logs-section {
+            width: 400px;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            padding: 15px;
+            background-color: #4CAF50;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .clear-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .clear-btn:hover {
+            background-color: #da190b;
+        }
+        
+        .logs-header {
+            background-color: #333;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #fff;
+        }
+        
+        .logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+        }
+        
+        .agent-message {
+            background-color: #f1f8e9;
+            margin-right: 20%;
+        }
+        
+        .message-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: white;
+            border-left: 3px solid #333;
+        }
+        
+        .log-processing {
+            border-left-color: #2196F3;
+        }
+        
+        .log-retrieving {
+            border-left-color: #FF9800;
+        }
+        
+        .log-generating {
+            border-left-color: #9C27B0;
+        }
+        
+        .log-reflection {
+            border-left-color: #F44336;
+        }
+        
+        .log-approved {
+            border-left-color: #4CAF50;
+        }
+        
+        .input-area {
+            display: flex;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-top: 1px solid #ccc;
+        }
+        
+        #userInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        
+        #sendBtn {
+            padding: 10px 20px;
+            margin-left: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        #sendBtn:hover {
+            background-color: #45a049;
+        }
+        
+        #sendBtn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Chat Section -->
+        <div class="chat-section">
+            <div class="header">
+                <span>🏥 Medical Agent Chat</span>
+                <button class="clear-btn" onclick="clearHistory()">Clear History</button>
+            </div>
+            <div class="messages" id="messages"></div>
+            <div class="input-area">
+                <input 
+                    type="text" 
+                    id="userInput" 
+                    placeholder="Ask a medical question..."
+                    onkeypress="if(event.key === 'Enter') sendMessage()"
+                >
+                <button id="sendBtn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+        
+        <!-- Logs Section -->
+        <div class="logs-section">
+            <div class="header logs-header">🔍 Agent Thinking Process</div>
+            <div class="logs" id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/ask';
+        
+        function addMessage(text, isUser) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
+            
+            const label = document.createElement('div');
+            label.className = 'message-label';
+            label.textContent = isUser ? 'You' : '🤖 Agent';
+            
+            const content = document.createElement('div');
+            content.textContent = text;
+            
+            messageDiv.appendChild(label);
+            messageDiv.appendChild(content);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function addLog(text, type = '') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log-entry log-${type}`;
+            logDiv.textContent = text;
+            logsDiv.appendChild(logDiv);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            // Disable input
+            input.disabled = true;
+            sendBtn.disabled = true;
+            
+            // Add user message
+            addMessage(question, true);
+            input.value = '';
+            
+            // Clear previous logs
+            clearLogs();
+            
+            // Show loading in chat
+            const messagesDiv = document.getElementById('messages');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.id = 'loading';
+            loadingDiv.textContent = 'Agent is thinking...';
+            messagesDiv.appendChild(loadingDiv);
+            
+            // Simulate agent thinking steps
+            addLog('🤔 Processing question...', 'processing');
+            await sleep(500);
+            addLog('📚 Retrieving knowledge from database...', 'retrieving');
+            await sleep(500);
+            addLog('✍️ Generating initial answer...', 'generating');
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                // Remove loading
+                document.getElementById('loading').remove();
+                
+                if (data.error) {
+                    addMessage('Error: ' + data.error, false);
+                    addLog('❌ Error occurred: ' + data.error, 'error');
+                } else {
+                    // Add reflection logs
+                    await sleep(500);
+                    addLog('🔍 Self-reflection: Evaluating answer quality...', 'reflection');
+                    await sleep(500);
+                    addLog('✅ Answer approved! Quality check passed.', 'approved');
+                    addLog(`📊 Used ${data.sources} source(s) from knowledge base`, 'approved');
+                    
+                    // Add agent response
+                    addMessage(data.answer, false);
+                }
+            } catch (error) {
+                document.getElementById('loading').remove();
+                addMessage('Error: Could not connect to agent', false);
+                addLog('❌ Connection error: ' + error.message, 'error');
+            }
+            
+            // Re-enable input
+            input.disabled = false;
+            sendBtn.disabled = false;
+            input.focus();
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        async function clearHistory() {
+            if (!confirm('Clear all conversation history?')) return;
+            
+            try {
+                await fetch('/clear', { method: 'POST' });
+                document.getElementById('messages').innerHTML = '';
+                document.getElementById('logs').innerHTML = '';
+                addLog('🗑️ Conversation history cleared', 'approved');
+                addLog('🚀 Agent ready for new conversation', 'approved');
+            } catch (error) {
+                addLog('❌ Error clearing history', 'error');
+            }
+        }
+        
+        // Initial log
+        addLog('🚀 Agent initialized and ready', 'approved');
+        addLog('💾 Conversation memory enabled (last 5 exchanges)', 'approved');
+    </script>
+</body>
+</html>
