@@ -66,6 +66,12 @@ python test_azure_env.py
 
 ### Step 5: Run the Project
 
+Build the document embedding in faiss vector DB. places you documents in 'data' folder. currently only pdf medical documents are supported.
+
+```bash
+python build_faiss_db.py
+```
+
 Run the main application:
 
 ```bash
@@ -216,6 +222,9 @@ Frontend:    Vanilla HTML/CSS/JS
 
 ```
 project/
+|__ data                # folder to store pdf
+|__ research            # notebook for intial r&d
+|__ build_faiss_db      # to build the faiss db from the pdf
 ├── agent_tools.py      # Retriever wrapper
 ├── agent_critic.py     # Self-reflection logic
 ├── medical_agent.py    # Main orchestration + memory
